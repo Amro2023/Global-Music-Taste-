@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 import os
-from typing import Optional
+from typing import Any, Optional
 
 import pandas as pd
 import requests
@@ -61,7 +61,7 @@ def _get_access_token() -> str:
 
 
 def spotify_get(url: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
-    token = get_access_token()
+    token = _get_access_token()
     headers = {"Authorization": f"Bearer {token}"}
     resp = requests.get(url, headers=headers, params=params, timeout=30)
     resp.raise_for_status()
