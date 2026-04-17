@@ -1,40 +1,63 @@
 from __future__ import annotations
 
-from pathlib import Path
 import base64
 import os
-from typing import Any
+from typing import Optional
 
+import pandas as pd
 import requests
-from dotenv import load_dotenv
 
+try:
+    import streamlit as st
+except Exception:
+    st = None
 
-APP_DIR = Path(__file__).resolve().parent
-load_dotenv(APP_DIR / ".env")
-load_dotenv(APP_DIR.parent / ".env")
-
-SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
-SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 
 TOKEN_URL = "https://accounts.spotify.com/api/token"
 SEARCH_URL = "https://api.spotify.com/v1/search"
 
 
-def get_access_token() -> str:
-    if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
-        raise ValueError("Missing SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET in .env")
+def _get_secret(name: str) -> Optional[str]:
+    value = os.getenv(name)
+    if value:
+        return value
 
-    raw = f"{SPOTIFY_CLIENT_ID}:{SPOTIFY_CLIENT_SECRET}"
-    auth = base64.b64encode(raw.encode("utf-8")).decode("utf-8")
+    if st is not None:
+        try:
+            return st.secrets[name]
+        except Exception:
+            return None
+
+    return None
+
+
+def _get_access_token() -> str:
+    client_id = _get_secret("SPOTIFY_CLIENT_ID")
+    client_secret = _get_secret("SPOTIFY_CLIENT_SECRET")
+
+    if not client_id or not client_secret:
+        raise ValueError(
+            "Missing SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET. "
+            "Set them in local .env or Streamlit secrets."
+        )
+
+    creds = f"{client_id}:{client_secret}"
+    basic = base64.b64encode(creds.encode("utf-8")).decode("utf-8")
+
     headers = {
-        "Authorization": f"Basic {auth}",
+        "Authorization": f"Basic {basic}",
         "Content-Type": "application/x-www-form-urlencoded",
     }
     data = {"grant_type": "client_credentials"}
 
     resp = requests.post(TOKEN_URL, headers=headers, data=data, timeout=30)
     resp.raise_for_status()
-    return resp.json()["access_token"]
+
+    payload = resp.json()
+    token = payload.get("access_token")
+    if not token:
+        raise ValueError("Spotify token response did not include access_token.")
+    return token
 
 
 def spotify_get(url: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
