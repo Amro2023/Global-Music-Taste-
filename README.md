@@ -1,1 +1,1 @@
-# Global-Music-Taste-
+# Global-Music-Taste-Explorer
